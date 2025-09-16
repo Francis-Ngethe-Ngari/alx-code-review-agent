@@ -1,0 +1,125 @@
+#!/bin/bash
+
+# Pre-commit hook for my-agent project
+# Ensures code quality before commits
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Load configuration
+CONFIG_FILE=".hooks-config.json"
+if [ -f "$CONFIG_FILE" ]; then
+    # Extract configuration (simplified - you might want to use jq for complex JSON)
+    RUN_TYPE_CHECK=$(grep -o '"runTypeCheck":\s*true' "$CONFIG_FILE" > /dev/null && echo "true" || echo "false")
+    RUN_LINTING=$(grep -o '"runLinting":\s*true' "$CONFIG_FILE" > /dev/null && echo "true" || echo "false")
+    RUN_FORMATTING=$(grep -o '"runFormatting":\s*true' "$CONFIG_FILE" > /dev/null && echo "true" || echo "false")
+    RUN_TESTS=$(grep -o '"runTests":\s*true' "$CONFIG_FILE" > /dev/null && echo "true" || echo "false")
+else
+    # Default values
+    RUN_TYPE_CHECK="true"
+    RUN_LINTING="true"
+    RUN_FORMATTING="true"
+    RUN_TESTS="false"
+fi
+
+# Check if we're in the right directory
+if [ ! -f "package.json" ]; then
+    echo "❌ Must be run from project root"
+    exit 1
+fi
+
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Check for required tools
+if ! command_exists bun; then
+    echo "❌ Bun is required but not installed"
+    exit 1
+fi
+
+# TypeScript type checking
+if [ "$RUN_TYPE_CHECK" = "true" ]; then
+    echo "📝 Checking TypeScript types..."
+    if ! bun run type-check; then
+        echo "❌ TypeScript type checking failed"
+        echo "💡 Fix type errors before committing"
+        exit 1
+    fi
+    echo "✅ TypeScript types OK"
+fi
+
+# ESLint checking
+if [ "$RUN_LINTING" = "true" ]; then
+    echo "🔍 Running ESLint..."
+    if ! bun run lint; then
+        echo "❌ ESLint found issues"
+        echo "💡 Run 'bun run lint:fix' to auto-fix some issues"
+        exit 1
+    fi
+    echo "✅ Linting passed"
+fi
+
+# Prettier formatting
+if [ "$RUN_FORMATTING" = "true" ]; then
+    echo "🎨 Checking code formatting..."
+    if ! bun run format:check; then
+        echo "❌ Code formatting issues found"
+        echo "💡 Run 'bun run format' to fix formatting"
+        exit 1
+    fi
+    echo "✅ Code formatting OK"
+fi
+
+# Run tests if enabled
+if [ "$RUN_TESTS" = "true" ]; then
+    echo "🧪 Running tests..."
+    if ! bun run test; then
+        echo "❌ Tests failed"
+        echo "💡 Fix failing tests before committing"
+        exit 1
+    fi
+    echo "✅ Tests passed"
+fi
+
+# Check for sensitive files
+echo "🔒 Checking for sensitive files..."
+SENSITIVE_FILES=(
+    ".env"
+    "*.key"
+    "*.pem"
+    "*password*"
+    "*secret*"
+)
+
+for pattern in "${SENSITIVE_FILES[@]}"; do
+    if git diff --cached --name-only | grep -q "$pattern"; then
+        echo "❌ Sensitive file detected: $pattern"
+        echo "💡 Add to .gitignore and remove from staging"
+        exit 1
+    fi
+done
+
+# Check for TODO/FIXME in staged files
+echo "📋 Checking for TODO/FIXME comments..."
+TODO_COUNT=$(git diff --cached | grep -c "TODO\|FIXME" || true)
+if [ "$TODO_COUNT" -gt 0 ]; then
+    echo "⚠️  Found $TODO_COUNT TODO/FIXME comments in staged changes"
+    echo "💡 Consider addressing these before committing"
+    # Don't fail, just warn
+fi
+
+# Check file sizes
+echo "📏 Checking file sizes..."
+LARGE_FILES=$(git diff --cached --name-only | xargs -I {} sh -c 'if [ -f "{}" ]; then echo "{}:$(stat -f%z "{}" 2>/dev/null || stat -c%s "{}" 2>/dev/null)"; fi' | awk -F: '$2 > 1048576 {print $1 " (" $2 " bytes)"}')
+
+if [ -n "$LARGE_FILES" ]; then
+    echo "⚠️  Large files detected:"
+    echo "$LARGE_FILES"
+    echo "💡 Consider if these files should be committed"
+fi
+
+echo "✅ All pre-commit checks passed!"
+echo "🚀 Ready to commit"

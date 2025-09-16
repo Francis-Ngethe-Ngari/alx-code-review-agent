@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# Commit message hook for my-agent project
+# Validates commit message format according to Conventional Commits
+
+commit_regex='^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\(.+\))?: .{1,100}'
+
+# Read the commit message
+commit_message=$(cat "$1")
+
+# Load configuration
+CONFIG_FILE=".hooks-config.json"
+if [ -f "$CONFIG_FILE" ]; then
+    MAX_LENGTH=$(grep -o '"maxLength":\s*[0-9]*' "$CONFIG_FILE" | grep -o '[0-9]*' || echo "100")
+    ENFORCE_CONVENTIONAL=$(grep -o '"enforceConventionalCommits":\s*true' "$CONFIG_FILE" > /dev/null && echo "true" || echo "false")
+else
+    MAX_LENGTH="100"
+    ENFORCE_CONVENTIONAL="true"
+fi
+
+echo "📝 Validating commit message..."
+
+# Check if message is empty
+if [ -z "$(echo "$commit_message" | tr -d '[:space:]')" ]; then
+    echo "❌ Commit message cannot be empty"
+    exit 1
+fi
+
+# Check message length
+message_length=${#commit_message}
+if [ "$message_length" -gt "$MAX_LENGTH" ]; then
+    echo "❌ Commit message too long: $message_length characters (max: $MAX_LENGTH)"
+    echo "💡 Keep commit messages concise and descriptive"
+    exit 1
+fi
+
+# Check for Conventional Commits format if enforced
+if [ "$ENFORCE_CONVENTIONAL" = "true" ]; then
+    if ! echo "$commit_message" | grep -qE "$commit_regex"; then
+        echo "❌ Commit message does not follow Conventional Commits format"
+        echo ""
+        echo "📋 Expected format:"
+        echo "   type(scope): description"
+        echo ""
+        echo "📖 Valid types:"
+        echo "   feat     - New feature"
+        echo "   fix      - Bug fix"
+        echo "   docs     - Documentation changes"
+        echo "   style    - Code style changes (formatting, etc.)"
+        echo "   refactor - Code refactoring"
+        echo "   perf     - Performance improvements"
+        echo "   test     - Adding or updating tests"
+        echo "   chore    - Maintenance tasks"
+        echo "   ci       - CI/CD changes"
+        echo "   build    - Build system changes"
+        echo "   revert   - Revert previous commit"
+        echo ""
+        echo "✅ Examples:"
+        echo "   feat(core): add AI model configuration"
+        echo "   fix(git): handle empty repository case"
+        echo "   docs: update installation guide"
+        echo ""
+        echo "🔍 Your message:"
+        echo "   $commit_message"
+        exit 1
+    fi
+fi
+
+# Check for common issues
+if echo "$commit_message" | grep -q "^wip\|^WIP\|^temp\|^TEMP"; then
+    echo "⚠️  Work-in-progress commit detected"
+    echo "💡 Consider using a more descriptive message for main branch"
+fi
+
+# Check for merge commit
+if echo "$commit_message" | grep -q "^Merge "; then
+    echo "ℹ️  Merge commit detected - skipping validation"
+    exit 0
+fi
+
+# Check for revert commit
+if echo "$commit_message" | grep -q "^Revert "; then
+    echo "ℹ️  Revert commit detected - skipping validation"
+    exit 0
+fi
+
+# Warn about imperative mood
+if echo "$commit_message" | grep -qE "(ed|ing)\s*$"; then
+    echo "⚠️  Consider using imperative mood (e.g., 'add' not 'added' or 'adding')"
+fi
+
+echo "✅ Commit message validation passed!"

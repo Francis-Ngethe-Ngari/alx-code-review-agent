@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Git Hooks Configuration",
+  "description": "Configuration file for my-agent Git hooks",
+  "type": "object",
+  "properties": {
+    "preCommit": {
+      "type": "object",
+      "description": "Pre-commit hook configuration",
+      "properties": {
+        "runLinting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run ESLint and Prettier on staged files"
+        },
+        "runTypeCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run TypeScript type checking"
+        },
+        "runTests": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run tests on pre-commit (can be slow)"
+        },
+        "autoFix": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically fix linting and formatting issues"
+        },
+        "stageFixed": {
+          "type": "boolean",
+          "default": true,
+          "description": "Stage automatically fixed files"
+        },
+        "excludePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["*.min.js", "*.bundle.js", "dist/**", "build/**"],
+          "description": "File patterns to exclude from checks"
+        }
+      }
+    },
+    "commitMsg": {
+      "type": "object",
+      "description": "Commit message hook configuration",
+      "properties": {
+        "enforceConventionalCommits": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enforce Conventional Commits format"
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 200,
+          "default": 100,
+          "description": "Maximum commit message length"
+        },
+        "allowedTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "feat", "fix", "docs", "style", "refactor", 
+            "perf", "test", "chore", "ci", "build", "revert"
+          ],
+          "description": "Allowed commit types for Conventional Commits"
+        },
+        "requireScope": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require scope in commit messages"
+        },
+        "allowedScopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["core", "cli", "tools", "utils", "workflows", "docs", "config"],
+          "description": "Allowed scopes when requireScope is true"
+        }
+      }
+    },
+    "prePush": {
+      "type": "object",
+      "description": "Pre-push hook configuration",
+      "properties": {
+        "runTests": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run full test suite before push"
+        },
+        "runBuild": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run build before push"
+        },
+        "checkDependencies": {
+          "type": "boolean",
+          "default": false,
+          "description": "Check and install dependencies if package.json changed"
+        },
+        "checkBranchProtection": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn when pushing directly to protected branches"
+        },
+        "protectedBranches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["main", "master", "develop"],
+          "description": "List of protected branch names"
+        },
+        "maxFileSize": {
+          "type": "integer",
+          "minimum": 1048576,
+          "default": 10485760,
+          "description": "Maximum file size in bytes (default: 10MB)"
+        }
+      }
+    },
+    "general": {
+      "type": "object",
+      "description": "General hook configuration",
+      "properties": {
+        "packageManager": {
+          "type": "string",
+          "enum": ["auto", "bun", "npm", "yarn"],
+          "default": "auto",
+          "description": "Preferred package manager (auto-detect if 'auto')"
+        },
+        "verbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose output from hooks"
+        },
+        "skipCI": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip hooks when CI environment is detected"
+        },
+        "enableEmojis": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use emojis in hook output messages"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

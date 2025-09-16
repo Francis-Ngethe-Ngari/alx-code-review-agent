@@ -1,0 +1,122 @@
+#!/bin/bash
+
+# Pre-push hook for my-agent project
+# Runs final checks before pushing to remote
+
+echo "🚀 Running pre-push checks..."
+
+# Load configuration
+CONFIG_FILE=".hooks-config.json"
+if [ -f "$CONFIG_FILE" ]; then
+    RUN_TESTS=$(grep -o '"runTestsOnPush":\s*true' "$CONFIG_FILE" > /dev/null && echo "true" || echo "false")
+    RUN_BUILD=$(grep -o '"runBuildOnPush":\s*true' "$CONFIG_FILE" > /dev/null && echo "true" || echo "false")
+    CHECK_DEPENDENCIES=$(grep -o '"checkDependencies":\s*true' "$CONFIG_FILE" > /dev/null && echo "true" || echo "false")
+else
+    RUN_TESTS="true"
+    RUN_BUILD="true"
+    CHECK_DEPENDENCIES="false"
+fi
+
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Determine package manager
+if command_exists bun; then
+    PKG_MANAGER="bun"
+    TEST_CMD="bun test"
+    BUILD_CMD="bun run build"
+    INSTALL_CMD="bun install"
+elif command_exists npm; then
+    PKG_MANAGER="npm"
+    TEST_CMD="npm test"
+    BUILD_CMD="npm run build"
+    INSTALL_CMD="npm install"
+else
+    echo "❌ No package manager found (bun or npm required)"
+    exit 1
+fi
+
+echo "📦 Using package manager: $PKG_MANAGER"
+
+# Check for dependency updates if enabled
+if [ "$CHECK_DEPENDENCIES" = "true" ]; then
+    echo "🔍 Checking for dependency changes..."
+    if git diff --cached --name-only | grep -q "package.json\|bun.lock\|package-lock.json"; then
+        echo "📦 Package dependencies changed - running install..."
+        if ! $INSTALL_CMD; then
+            echo "❌ Dependency installation failed"
+            exit 1
+        fi
+    fi
+fi
+
+# Check if there are any staged TypeScript/JavaScript files
+if git diff --cached --name-only | grep -qE '\.(ts|js|jsx|tsx)$'; then
+    echo "🔧 TypeScript/JavaScript files detected in commit"
+    
+    # Type check
+    echo "🔍 Running TypeScript type check..."
+    if command_exists tsc; then
+        if ! tsc --noEmit; then
+            echo "❌ TypeScript type check failed"
+            echo "💡 Fix type errors before pushing"
+            exit 1
+        fi
+    else
+        echo "⚠️  TypeScript compiler not found - skipping type check"
+    fi
+fi
+
+# Run tests if enabled
+if [ "$RUN_TESTS" = "true" ]; then
+    echo "🧪 Running tests..."
+    if ! $TEST_CMD; then
+        echo "❌ Tests failed"
+        echo "💡 Fix failing tests before pushing"
+        exit 1
+    fi
+    echo "✅ All tests passed"
+fi
+
+# Run build if enabled
+if [ "$RUN_BUILD" = "true" ]; then
+    echo "🔨 Running build..."
+    if ! $BUILD_CMD; then
+        echo "❌ Build failed"
+        echo "💡 Fix build errors before pushing"
+        exit 1
+    fi
+    echo "✅ Build successful"
+fi
+
+# Check for sensitive files
+echo "🔒 Checking for sensitive files..."
+sensitive_files=$(git diff --cached --name-only | grep -E '\.(env|key|pem|p12|pfx)$|secrets|credentials' || true)
+if [ -n "$sensitive_files" ]; then
+    echo "❌ Sensitive files detected in commit:"
+    echo "$sensitive_files"
+    echo "💡 Remove sensitive files from commit or add to .gitignore"
+    exit 1
+fi
+
+# Check for large files (>10MB)
+echo "📏 Checking for large files..."
+large_files=$(git diff --cached --name-only | xargs -I {} sh -c 'if [ -f "{}" ] && [ $(stat -c%s "{}" 2>/dev/null || stat -f%z "{}" 2>/dev/null || echo 0) -gt 10485760 ]; then echo "{}"; fi' | head -5)
+if [ -n "$large_files" ]; then
+    echo "❌ Large files detected (>10MB):"
+    echo "$large_files"
+    echo "💡 Consider using Git LFS for large files"
+    exit 1
+fi
+
+# Warn about direct pushes to main/master
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
+    echo "⚠️  Pushing directly to $current_branch branch"
+    echo "💡 Consider using feature branches and pull requests"
+fi
+
+echo "✅ Pre-push checks completed successfully!"
+echo "🎉 Ready to push to remote repository"

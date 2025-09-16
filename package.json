@@ -1,10 +1,56 @@
 {
   "name": "my-agent",
-  "module": "index.ts",
+  "version": "0.1.0",
+  "description": "An AI-powered code review agent built with TypeScript and Bun",
+  "main": "dist/index.js",
+  "module": "src/index.ts",
+  "bin": {
+    "my-agent": "./dist/cli/index.js"
+  },
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun run src/core/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target node",
+    "start": "bun run dist/index.js",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "format:check": "prettier --check src/**/*.ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist",
+    "review": "bun run src/workflows/quick-review.ts",
+    "commit-msg": "bun run src/workflows/commit-assistant.ts",
+    "save-review": "bun run src/utils/review-writer.ts",
+    "workflow": "bun run src/workflows/review-and-commit.ts",
+    "workflow:auto": "bun run src/workflows/review-and-commit.ts . --auto-commit",
+    "workflow:save": "bun run src/workflows/review-and-commit.ts . --save-review",
+    "hooks:install": "powershell -ExecutionPolicy Bypass -File scripts/install-hooks.ps1",
+    "hooks:install:bash": "bash scripts/install-hooks.sh",
+    "hooks:uninstall": "powershell -ExecutionPolicy Bypass -File scripts/uninstall-hooks.ps1",
+    "hooks:check": "powershell -Command \"Get-ChildItem .git/hooks/ | Where-Object { \\$_.Name -match '(pre-commit|commit-msg|pre-push)' -and \\$_.Name -notmatch '\\.sample' } | Select-Object Name, Length, LastWriteTime\""
+  },
+  "keywords": [
+    "ai",
+    "code-review",
+    "gemini",
+    "typescript",
+    "bun",
+    "automation"
+  ],
+  "author": "Francis Ngethe Ngari",
+  "license": "MIT",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.44.0",
+    "@typescript-eslint/parser": "^8.44.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "vitest": "^3.2.4",
+    "@vitest/coverage-v8": "^1.0.0"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -12,7 +58,12 @@
   "dependencies": {
     "@ai-sdk/google": "^2.0.14",
     "ai": "^5.0.44",
+    "commander": "^14.0.1",
     "simple-git": "^3.28.0",
     "zod": "^4.1.8"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
   }
 }
